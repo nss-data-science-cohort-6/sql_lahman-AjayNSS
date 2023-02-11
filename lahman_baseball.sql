@@ -58,8 +58,7 @@ FROM fielding f
 WHERE yearid = '2016'
 GROUP BY g_pos;
 
-select distinct yearid from public.batting
-order by 1 
+
 
 -- 3. Find the average number of strikeouts per game by decade since 1920. 
 -- Round the numbers you report to 2 decimal places. Do the same for home runs per game. 
@@ -70,6 +69,7 @@ order by 1
 
 WITH decade AS (SELECT 
 generate_series (1920, 2016, 10) AS decade_group)
+
 	SELECT decade_group,
 	COALESCE(ROUND (SUM(so)*1.0/SUM(g), 2), 0) as AvgSO_game,
 	COALESCE(ROUND (SUM(hr)*1.0/SUM(g), 2), 0) as AvgHR_game
@@ -92,12 +92,98 @@ generate_series (1920, 2016, 10) AS decade_group)
 	ORDER BY generate_series DESC
 
 
--- 4. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases. Report the players' names, number of stolen bases, number of attempts, and stolen base percentage.
+-- 4. Find the player who had the most success stealing bases in 2016, where __success__ 
+-- is measured as the percentage of stolen base attempts which are successful. 
+-- (A stolen base attempt results either in a stolen base or being caught stealing.) 
+-- Consider only players who attempted _at least_ 20 stolen bases. Report the players' names, 
+-- number of stolen bases, number of attempts, and stolen base percentage.
+--AK ref batting, b, cs
 
--- 5. From 1970 to 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion; determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 to 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+with sb_attempts as(
+		SELECT playerid
+			,sb
+			,sb + cs as sb_attemps
+			, ROUND((sb * 1.0/(sb+cs)), 2)  * 100 as success_max_sb 
+		FROM batting 
+		WHERE yearid= 2016
+			AND sb >=20
+		ORDER BY success_max_sb DESC
+)
 
+SELECT 	
+	 namefirst
+	,namelast
+	,s.sb
+	,s.sb_attemps
+	,s.success_max_sb
+FROM people p
+Inner JOIN sb_attempts s ON p.playerid = s.playerid
+
+
+ 
+	   
+
+-- 5-A From 1970 to 2016, what is the largest number of wins for a team that did not win the world series? 
+-- B- What is the smallest number of wins for a team that did win the world series? Doing this will probably 
+-- result in an unusually small number of wins for a world series champion; determine why this is the case. 
+-- Then redo your query, excluding the problem year. How often from 1970 to 2016 was it the case that a team 
+-- with the most wins also won the world series? What percentage of the time?
+
+
+-- 116
+
+--5A From 1970 to 2016, what is the largest number of wins for a team that did not win the world series? 
+SELECT teamid, yearid, max(W) as largest_wins
+FROM teams
+WHERE WSWin = 'N'
+and yearid BETWEEN 1970 and 2016
+group by teamid, yearid
+order by largest_wins desc
+
+
+--5B What is the smallest number of wins for a team that did win the world series? 
+SELECT teamid, yearid, min(W) as smallest_wins
+FROM teams
+WHERE WSWin = 'Y'
+and yearid BETWEEN 1970 and 2016
+group by teamid, yearid
+order by smallest_wins 
+
+--5C- Then redo your query, excluding the problem year. How often from 1970 to 2016 was it the case that a team 
+-- with the most wins also won the world series? What percentage of the time?
+WITH most_wins as
+(
+	SELECT teamid,
+				   name,
+				   yearid,
+				   w,
+				   RANK() OVER(PARTITION BY yearid ORDER BY w DESC)
+			FROM teams
+			WHERE yearid >= 1970 and yearid <> 1981
+),
+				   
+ ws_winner as
+(
+	SELECT teamid, name, yearid, w
+	FROM teams
+	WHERE wswin = 'Y'
+		AND yearid >= 1970
+	ORDER BY w desc
+)
+
+select 
+	a.teamid,
+	a.name,
+	a.yearid,
+	a.w,
+	b.w
+from most_wins a inner join ws_winner b on a.teamid = b.teamid and a.yearid = b.yearid
+
+
+			   
 -- 6. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
-
+--manager
+--award manager
 -- 7. Which pitcher was the least efficient in 2016 in terms of salary / strikeouts? Only consider pitchers who started at least 10 games (across all teams). Note that pitchers often play for more than one team in a season, so be sure that you are counting all stats for each player.
 
 -- 8. Find all players who have had at least 3000 career hits. Report those players' names, total number of hits, and the year they were inducted into the hall of fame (If they were not inducted into the hall of fame, put a null in that column.) Note that a player being inducted into the hall of fame is indicated by a 'Y' in the **inducted** column of the halloffame table.
