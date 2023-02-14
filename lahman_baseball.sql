@@ -181,10 +181,59 @@ from most_wins a inner join ws_winner b on a.teamid = b.teamid and a.yearid = b.
 
 
 			   
--- 6. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+-- 6. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? 
+--Give their full name and the teams that they were managing when they won the award.
 --manager
 --award manager
--- 7. Which pitcher was the least efficient in 2016 in terms of salary / strikeouts? Only consider pitchers who started at least 10 games (across all teams). Note that pitchers often play for more than one team in a season, so be sure that you are counting all stats for each player.
+
+SELECT DISTINCT p.playerid
+		, teamid
+		, namefirst
+		, namelast
+FROM people as p
+INNER JOIN managers m
+	ON p.playerid = m.playerid
+WHERE m.playerid IN
+					(
+						SELECT DISTINCT playerid
+						FROM awardsmanagers
+						WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year' 
+					)
+AND m.playerid IN
+					(
+						SELECT DISTINCT playerid
+						FROM awardsmanagers 
+						WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year'  
+					)
+
+
+
+
+-- 7. Which pitcher was the least efficient in 2016 in terms of salary / strikeouts? 
+-- Only consider pitchers who started at least 10 games (across all teams). 
+-- Note that pitchers often play for more than one team in a season, so be sure that you are counting all stats for each player.
+
+WITH sum_so AS(
+	SELECT playerid,
+		SUM(so) AS pitch_so
+	FROM pitching
+	WHERE yearid = 2016	AND gs >= 10
+	GROUP BY playerid
+	ORDER BY pitch_so 
+	)
+
+SELECT   playerid
+	, SUM(salary)::numeric::money AS tot_salary
+	, s.pitch_so
+	, (SUM(salary)/s.pitch_so )::numeric::money  as sal_so
+FROM salaries
+	INNER JOIN sum_so s USING(playerid)
+WHERE yearid = 2016
+GROUP BY playerid, pitch_so
+ORDER BY sal_so, s.pitch_so
+	
+
+
 
 -- 8. Find all players who have had at least 3000 career hits. Report those players' names, total number of hits, and the year they were inducted into the hall of fame (If they were not inducted into the hall of fame, put a null in that column.) Note that a player being inducted into the hall of fame is indicated by a 'Y' in the **inducted** column of the halloffame table.
 
